@@ -111,7 +111,7 @@ class ResRecord:
         elif self.type == 5:
             self.resource_data = CNAME_Resource(mess, off)
         else:
-            print("ERROR\tRecord is not of type A or CNAME")
+            print("NOTFOUND")
             quit()
 
         return off + self.rd_length
@@ -351,8 +351,8 @@ else:
     name = sys.argv[2]
     if(len(servernport) < 2):
         port = 53
-    # else:
-    #     port = servernport[1]
+    else:
+        port = servernport[1]
     print(port)
     print(server)
     client = DNSClient(server, port)
