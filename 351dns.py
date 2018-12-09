@@ -89,6 +89,8 @@ class CNAME_Resource:
     def __init__(self, mess, off):
         self.name = decode_string(mess, off)[0]
 
+# Extract response record:
+# 
 class ResRecord:
 
     def decode(self, mess, off):
@@ -283,6 +285,7 @@ class DNSClient:
         print(str(codecs.encode(query, "hex"), "utf-8"))
         print("\nSending packet . . .\n")
 
+        # Sends DNS Query Packet to specified DNS server using
         self.socket.send(query)
         try:
             response = self.socket.recv(1024)
