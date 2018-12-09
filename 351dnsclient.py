@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 DNSClient Class calls for the query construction and sending queries back and forth
 to the respective DNS server. DNSClient verifies the responses and outputs to STDOUT.
@@ -113,20 +114,30 @@ class DNSClient:
                     quit()
 
 
+=======
+import socket
+import codecs
+import sys
+import struct
+import random
+import math
+import base64
+import hashlib
+>>>>>>> a6a5bdd8befce74dbd904d7c8d2ddc82c77a18fd
+
+if len(sys.argv) != 4:
+    print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
+elif sys.argv[1][0] != "@":
+    print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
+elif sys.argv[3] != 'A' or sys.argv[3] != 'DNSKEY' or sys.argv[3] != 'DS':
+    print("Record argument must be A(A records), DNSKEY(DNSKEY records), or DS(DS records).")
+else:
+    serverInfo = sys.argv[1][1:].split(':')
+    server = serverInfo[0]
+    port = serverInfo[1]
 
 
-def main():
-    if len(sys.argv) != 4:
-        print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
-    elif sys.argv[1][0] != "@":
-        print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
-    elif sys.argv[3] != 'A' or sys.argv[3] != 'DNSKEY' or sys.argv[3] != 'DS':
-        print("Record argument must be A(A records), DNSKEY(DNSKEY records), or DS(DS records).")
-    else:
-        serverInfo = sys.argv[1][1:].split(':')
-        server = serverInfo[0]
-        port = serverInfo[1]
-
+<<<<<<< HEAD
     name = sys.argv[2]
     if(len(servernport) < 2):
         port = 53
@@ -136,5 +147,19 @@ def main():
     print(server)
     client = DNSClient(server, port)
     client.sendQuery(name)
+=======
+name = sys.argv[2]
+if(len(serverInfo) < 2):
+    port = 53
+else:
+    port = serverInfo[1]
+>>>>>>> a6a5bdd8befce74dbd904d7c8d2ddc82c77a18fd
 
-    client.socket.close()
+record = sys.argv[3]
+
+print(port)
+print(server)
+client = DNSClient(server, port)
+client.sendQuery(name)
+
+client.socket.close()
