@@ -170,20 +170,31 @@ class DNSMessageFormat:
         for i in range(0,self.header.ns):
             self.auth_RRs.append(ResRecord())
             off = self.auth_RRs[i].decode(mess, off)
-        for i in range(0,self.header.ar):
-            self.addit_RRs.append(ResRecord())
-            off = self.addit_RRs[i].decode(mess, off)
 
-class AResource:
-    def __init__(self, data):
-        ip = st.unpack('BBBB', data)
+###########################################
+#         Record Class Information        #
+###########################################
+
+class A_Resource:
+    def __init__(self, record_header, rdata):
+        ip = st.unpack('BBBB', rdata)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
 
-class CNAME_Resource:
-    def __init__(self, mess, off):
-        self.name = decode_string(mess, off)[0]
+class DNSKEY_Resource:
+    def __init___(self, record_header, rdata):
+        self.record_header = record_header
+        print("DNSKEY") 
 
+class DS_Resource:
+    def __init__(self, record_header, rdata):
+        self.record_header = record_header
+
+class RRSIG_Resource:
+    def __init__(self, record_header, rdata):
+        self.record_header = record_header
+
+    
 
 # Extract response record:
 class ResRecord:
@@ -202,11 +213,15 @@ class ResRecord:
         off += 2
 
         rdata = mess[off: off + self.rd_length]
-
+        print("self.type: ", self.type)
         if self.type == 1:
-            self.resource_data = AResource(rdata)
-        elif self.type == 5:
-            self.resource_data = CNAME_Resource(mess, off)
+            self.resource_data = A_Resource(self, rdata)
+        elif self.type == 43:
+            self.resource_data = DS_Resource(self, rdata)
+        elif self.type == 46:
+            self.resource_data = RRSIG_Resource(self, rdata)
+        elif self.type == 48:
+            self.resource_data = DNSKEY_Resource(self, rdata)
         else:
             print("ERROR\tRecord is not of type A or CNAME")
             quit()
@@ -389,43 +404,50 @@ class DNSClient:
         print('\n')
         print("\nSending packet . . .\n")
 
-        # Sends DNS Query Packet to specified DNS server using
+        # Sends DNS Query Packet to specified DNS server using UDP
         self.socket.send(query)
         try:
             response = self.socket.recv(1024)
         except Exception:
-            # Timeout
+            # Timeout Exception found
             print("NORESPONSE\n")
             quit()
 
-        #TODO
         # CODE IN DNS_DATA TAKES CARE OF THE RESPONSE
         print('\nRESPONSE')
         hexdump(response)
+
         dns_packet.decode(response)
 
-        #TODO TODO
-        # FOR DEBUGGING, REMOVE LATER ?
         print("*** RESPONSE FROM SERVER ***\n")
-
 
         # check for error in response code
         self.check_for_error(dns_packet.header.rcode)
 
+        print("dns_packet.answers: ", len(dns_packet.answers) )
         if len(dns_packet.answers) > 0:
             # go through the answers in the packet
             for answer in dns_packet.answers:
                 # check whether there's authoritation
-                if bool(dns_packet.header.aa) == True:
-                    if answer.type == 1:
-                        print("IP\t" + str(answer.resource_data.ip) + "\t" + "auth")
-                    elif answer.type == 5:
-                        print("CNAME\t" + str(answer.resource_data.name) + "\t" + "auth")
-                else:
-                    if answer.type == 1:
-                        print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
-                    elif answer.type == 5:
-                        print("CNAME\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                print('INSIDE THE ELSE STATEMENT: ', answer.type)
+                if answer.type == 1:
+                    print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
+                elif answer.type == 43:
+                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                elif answer.type == 46:
+                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                elif answer.type == 48:
+                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+
+        if self.type == 1:
+            self.resource_data = A_Resource(rdata)
+        elif self.type == 43:
+            self.resource_data = DS_Resource(rdata)
+        elif self.type == 46:
+            self.resource_data = RRSIG_Resource(rdata)
+        elif self.type == 48:
+            self.resource_data = DNSKEY_Resource(rdata)
+
 
             print("")
             self.socket.close()
