@@ -188,19 +188,17 @@ class DNSMessageFormat:
             off = self.addit_RRs[i].decode(mess, off)
 
 class AResource:
-
     def __init__(self, data):
         ip = st.unpack('BBBB', data)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
 
 class CNAME_Resource:
-
     def __init__(self, mess, off):
         self.name = decode_string(mess, off)[0]
 
 
-
+# Extract response record:
 class ResRecord:
 
     def decode(self, mess, off):
@@ -223,7 +221,7 @@ class ResRecord:
         elif self.type == 5:
             self.resource_data = CNAME_Resource(mess, off)
         else:
-            print("NOTFOUND")
+            print("ERROR\tRecord is not of type A or CNAME")
             quit()
 
         return off + self.rd_length
@@ -403,6 +401,7 @@ class DNSClient:
         print('\n')
         print("\nSending packet . . .\n")
 
+        # Sends DNS Query Packet to specified DNS server using
         self.socket.send(query)
         try:
             response = self.socket.recv(1024)
@@ -478,6 +477,7 @@ else:
         port = 53
     else:
         port = servernport[1]
+
 
     client = DNSClient(server, port)
     client.sendQuery(name)
