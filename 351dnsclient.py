@@ -11,104 +11,100 @@ addit_rec = bytes([0,0,41,16,0,0,0,128,0,0,0])
 
 # --- - chunking helpers
 def chunks(seq, size):
-  '''Generator that cuts sequence (bytes, memoryview, etc.)
-     into chunks of given size. If `seq` length is not multiply
-     of `size`, the lengh of the last chunk returned will be
-     less than requested.
+    '''Generator that cuts sequence (bytes, memoryview, etc.)
+        into chunks of given size. If `seq` length is not multiply
+        of `size`, the lengh of the last chunk returned will be
+        less than requested.
 
-     >>> list( chunks([1,2,3,4,5,6,7], 3) )
-     [[1, 2, 3], [4, 5, 6], [7]]
-  '''
-  d, m = divmod(len(seq), size)
-  for i in range(d):
-    yield seq[i*size:(i+1)*size]
-  if m:
-    yield seq[d*size:]
+        >>> list( chunks([1,2,3,4,5,6,7], 3) )
+        [[1, 2, 3], [4, 5, 6], [7]]
+    '''
+    d, m = divmod(len(seq), size)
+    for i in range(d):
+        yield seq[i*size:(i+1)*size]
+    if m:
+        yield seq[d*size:]
 
 def chunkread(f, size):
-  '''Generator that reads from file like object. May return less
-     data than requested on the last read.'''
-  c = f.read(size)
-  while len(c):
-    yield c
+    '''Generator that reads from file like object. May return less
+        data than requested on the last read.'''
     c = f.read(size)
+    while len(c):
+        yield c
+        c = f.read(size)
 
 def genchunks(mixed, size):
-  '''Generator to chunk binary sequences or file like objects.
-     The size of the last chunk returned may be less than
-     requested.'''
-  if hasattr(mixed, 'read'):
-    return chunkread(mixed, size)
-  else:
-    return chunks(mixed, size)
-# --- - /chunking helpers
+    '''Generator to chunk binary sequences or file like objects.
+        The size of the last chunk returned may be less than
+        requested.'''
+    if hasattr(mixed, 'read'):
+        return chunkread(mixed, size)
+    else:
+        return chunks(mixed, size)
+    # --- - /chunking helpers
 
 def dump(binary, size=2, sep=' '):
-  '''
-  Convert binary data (bytes in Python 3 and str in
-  Python 2) to hex string like '00 DE AD BE EF'.
-  `size` argument specifies length of text chunks
-  and `sep` sets chunk separator.
-  '''
-  hexstr = binascii.hexlify(binary)
-  if PY3K:
-    hexstr = hexstr.decode('ascii')
-  return sep.join(chunks(hexstr.upper(), size))
+    '''
+    Convert binary data (bytes in Python 3 and str in
+    Python 2) to hex string like '00 DE AD BE EF'.
+    `size` argument specifies length of text chunks
+    and `sep` sets chunk separator.
+    '''
+    hexstr = binascii.hexlify(binary)
+    if PY3K:
+        hexstr = hexstr.decode('ascii')
+    return sep.join(chunks(hexstr.upper(), size))
 
 def dumpgen(data):
-  '''
-  Generator that produces strings:
+    '''
+    Generator that produces strings:
+    '00000000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................'
+    '''
+    generator = genchunks(data, 16)
+    for addr, d in enumerate(generator):
+        # 00000000:
+        line = '%08X: ' % (addr*16)
+        # 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00 
+        dumpstr = dump(d)
+        line += dumpstr[:8*3]
+        if len(d) > 8:  # insert separator if needed
+            line += ' ' + dumpstr[8*3:]
+        # ................
+        # calculate indentation, which may be different for the last line
+        pad = 2
+        if len(d) < 16:
+            pad += 3*(16 - len(d))
+        if len(d) <= 8:
+            pad += 1
+        line += ' '*pad
 
-  '00000000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................'
-  '''
-  generator = genchunks(data, 16)
-  for addr, d in enumerate(generator):
-    # 00000000:
-    line = '%08X: ' % (addr*16)
-    # 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00 
-    dumpstr = dump(d)
-    line += dumpstr[:8*3]
-    if len(d) > 8:  # insert separator if needed
-      line += ' ' + dumpstr[8*3:]
-    # ................
-    # calculate indentation, which may be different for the last line
-    pad = 2
-    if len(d) < 16:
-      pad += 3*(16 - len(d))
-    if len(d) <= 8:
-      pad += 1
-    line += ' '*pad
-
-    for byte in d:
-      # printable ASCII range 0x20 to 0x7E
-      if not PY3K:
-        byte = ord(byte)
-      if 0x20 <= byte <= 0x7E:
-        line += chr(byte)
-      else:
-        line += '.'
-    yield line
+        for byte in d:
+        # printable ASCII range 0x20 to 0x7E
+            if not PY3K:
+                byte = ord(byte)
+            if 0x20 <= byte <= 0x7E:
+                line += chr(byte)
+            else:
+                line += '.'
+        yield line
   
 def hexdump(data):
-  '''
-  Transform binary data to the hex dump text format:
-
-  00000000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
-
+    '''
+    Transform binary data to the hex dump text format:
+    00000000: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
     [x] data argument as a binary string
     [x] data argument as a file like object
-
-  Returns result depending on the `result` argument:
+    Returns result depending on the `result` argument:
     'print'     - prints line by line
     'return'    - returns single string
     'generator' - returns generator that produces lines
-  '''
-  if PY3K and type(data) == str:
-    raise TypeError('Abstract unicode data (expected bytes sequence)')
+    '''
+    if PY3K and type(data) == str:
+        raise TypeError('Abstract unicode data (expected bytes sequence)')
 
-  gen = dumpgen(data)
-  for line in gen:
-    print(line)
+    gen = dumpgen(data)
+    for line in gen:
+        print(line)
 
 
 def decode_string(mess, off):
@@ -118,7 +114,7 @@ def decode_string(mess, off):
     while mess[ind] != 0:
         v = mess[ind]
         if (v>>6) == 3:
-            next = st.unpack('>H', mess[ind:ind + 2])[0]
+            next = st.unpack('!H', mess[ind:ind + 2])[0]
             if off == 0:
                 off = ind + 2
             ind = next ^ (3<<14)
@@ -196,13 +192,13 @@ class ResRecord:
         name = decode_string(mess, off)
         off = name[1]
         self.name = name[0]
-        self.type = st.unpack('>H',mess[off:off + 2])[0]
+        self.type = st.unpack('!H',mess[off:off + 2])[0]
         off += 2
-        self.req = st.unpack('>H', mess[off:off + 2])[0]
+        self.req = st.unpack('!H', mess[off:off + 2])[0]
         off += 2
-        self.ttl = st.unpack('>I', mess[off: off + 4])[0]
+        self.ttl = st.unpack('!I', mess[off: off + 4])[0]
         off += 4
-        self.rd_length = st.unpack('>H', mess[off:off + 2])[0]
+        self.rd_length = st.unpack('!H', mess[off:off + 2])[0]
         off += 2
 
         rdata = mess[off: off + self.rd_length]
@@ -224,8 +220,8 @@ class DNSQuest:
         name = decode_string(mess, off)
         off = name[1]
         self.name = name[0]
-        self.type = st.unpack('>H', mess[off:off + 2])[0]
-        self.req_class = st.unpack('>H', mess[off + 2:off + 4])[0]
+        self.type = st.unpack('!H', mess[off:off + 2])[0]
+        self.req_class = st.unpack('!H', mess[off + 2:off + 4])[0]
         return off + 4
 
     def encode_name(self):
@@ -275,9 +271,9 @@ class MessHeader:
         # Z
         self.z = 0
         # authentic data
-        self.ad = 0
+        self.ad = 1
         # checking disabled
-        self.cd = 0
+        self.cd = 1
         #response code
         self.rcode = 0
         # questions
@@ -388,6 +384,7 @@ class DNSClient:
         # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
         dns_packet = DNSMessageFormat()
         query = dns_packet.encode(request, recursion_desired, qtype)
+        print('query ', query)
         hexdump(query)
         print('\n')
         print("\nSending packet . . .\n")
@@ -455,32 +452,32 @@ class DNSClient:
 
 
 def main():
-	if len(sys.argv) != 4:
-		print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
-	elif sys.argv[1][0] != "@":
-		print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
-	elif sys.argv[3] != 'A' or sys.argv[3] != 'DNSKEY' or sys.argv[3] != 'DS':
-		print("Record argument must be A(A records), DNSKEY(DNSKEY records), or DS(DS records).")
-	else:
-		serverInfo = sys.argv[1][1:].split(':')
-		server = serverInfo[0]
-		port = serverInfo[1]
+    if len(sys.argv) != 4:
+        print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
+        return
+    elif sys.argv[1][0] != "@":
+        print("Usage: ./351dnsclient @<server:port> <domain-name> <record>")
+        return
+    elif sys.argv[3] != 'A' and sys.argv[3] != 'DNSKEY' and sys.argv[3] != 'DS':
+        print("Record argument must be A(A records), DNSKEY(DNSKEY records), or DS(DS records).")
+        return
+    else:
+        serverInfo = sys.argv[1][1:].split(':')
+        print('SERVER INFO: ', serverInfo)
+        server = serverInfo[0]
 
+    name = sys.argv[2]
+    if(len(serverInfo) == 2):
+        port = serverInfo[1]
+    else:
+        port = 53
+    record = sys.argv[3]
+    #print("port ", port)
+    #print("server ", server)
+    client = DNSClient(server, port)
+    client.sendQuery(name)
 
-	name = sys.argv[2]
-	if(len(serverInfo) < 2):
-		port = 53
-	else:
-		port = serverInfo[1]
-
-	record = sys.argv[3]
-
-	print(port)
-	print(server)
-	client = DNSClient(server, port)
-	client.sendQuery(name)
-
-	client.socket.close()
+    client.socket.close()
 
 if __name__ == '__main__':
   main()
