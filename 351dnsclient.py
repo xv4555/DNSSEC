@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+
+# Authors: David Zou and Connor Thorsen
+# Team: PleaseGiveUsAnA
+# CSCI 351 Project 4
+# DNSSEC Client
+
+# MUST RUN WITH PYTHON 3
+
 import socket
 import codecs
 import sys
@@ -130,18 +139,18 @@ def decode_string(mess, off):
 
 class DNSMessageFormat:
 
-    def encode(self, hname, recur_desired, qtype):
+    def encode(self, hname, recur_desired, record_type):
         mess = b''
         self.header = MessHeader()
         self.header.set_question_header(recur_desired)
         self.question = DNSQuest()
 
         self.question.name = hname
-        if(qtype == 'A'):
+        if(record_type == 'A'):
             self.question.type = 1
-        elif(qtype == 'DNSKEY'):
+        elif(record_type == 'DNSKEY'):
             self.question.type = 48
-        elif(qtype == 'ipv6'):
+        elif(record_type == 'ipv6'):
             self.question.type = 28
         else:
             self.question.type = 43
@@ -251,7 +260,6 @@ class RRSIG_Resource:
 #      Crypto Library Implementation      #
 ###########################################
 
-def 
 
 # Extract response record:
 class ResRecord:
@@ -453,11 +461,11 @@ class DNSClient:
     # function to send a request
     # TODO Can you comment/clean up this code? I think the professor is going to be grading our code moreso our output
     # so we should at least make it readable and have the correct intentions
-    def sendQuery(self, request, recursion_desired=True, qtype="A"):
+    def sendQuery(self, request, record_type, recursion_desired=True):
 
         # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
         dns_packet = DNSMessageFormat()
-        query = dns_packet.encode(request, recursion_desired, qtype)
+        query = dns_packet.encode(request, recursion_desired, record_type)
         print('query ', query)
         hexdump(query)
         print('\n')
@@ -487,11 +495,11 @@ class DNSClient:
         if len(dns_packet.answers) > 0:
             # go through the answers in the packet
             for answer in dns_packet.answers:
-                print('INSIDE THE ELSE STATEMENT: ', answer.type)
                 if answer.type == 1:
-                    print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
+                    #print("IP\t" + str(answer.resource_data.ip) + "\t" + str(answer.resource_data.digestType) + " VALID|INVALID")
+                    print("IP Output here")
                 elif answer.type == 43:
-                    #print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("DS\t" + str(answer.resource_data.digest) + "\t" + "nonauth")
                     print("Printing DS Record: ")
                 elif answer.type == 46:
                     #print("RRSIG\t" + str(answer.resource_data.name) + "\t" + "nonauth")
@@ -499,11 +507,10 @@ class DNSClient:
                 elif answer.type == 48:
                     #print("DNSKEY\t" + str(answer.resource_data.name) + "\t" + "nonauth")
                     print("Printing DNSKEY Record: ")
-                else:
-                    print("Printing from else: ERROR\t")
-                    # or NOTFOUND NORESPONSE
+
+
         print('PRINTING MYSELF: ', self)
-        # what does this do??
+        # what does this code here do cause this is where i'm lost ??
         if self.type == 1:
             self.resource_data = A_Resource(answer.resource_data)
         elif self.type == 43:
@@ -548,10 +555,9 @@ def main():
     else:
         port = 53
     record = sys.argv[3]
-    #print("port ", port)
-    #print("server ", server)
+
     client = DNSClient(server, port)
-    client.sendQuery(name)
+    client.sendQuery(name, record)
 
     client.socket.close()
 

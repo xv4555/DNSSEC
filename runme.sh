@@ -1,1 +1,1 @@
-chmod +x 351dns.py
+chmod +x 351dnsclient.py
