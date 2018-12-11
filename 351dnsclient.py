@@ -177,22 +177,63 @@ class DNSMessageFormat:
 
 class A_Resource:
     def __init__(self, record_header, rdata):
+        self.record = record_header
+        self.rdata = rdata
         ip = st.unpack('BBBB', rdata)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
+        print('A rdata: ', rdata)
 
 class DNSKEY_Resource:
     def __init___(self, record_header, rdata):
         self.record_header = record_header
-        print("DNSKEY") 
+        self.rdata = rdata
+        self.flags = 0
+        self.protocol = 0
+        self.algorithm = 0
+        print('DNSKEY rdata: ', rdata)
+
+    #unpack rdata
+    def unpack_DNSKEY_rdata(self):
+        self.flags, self.protocol, self.algorithm = st.unpack('!HBB', self.rdata)
+        self.rdata = self.rdata[4:]
+        self.digest = self.rdata
 
 class DS_Resource:
     def __init__(self, record_header, rdata):
         self.record_header = record_header
+        self.rdata = rdata
+        self.flags = 0
+        self.algorithm = 0
+        self.digestType = 0
+        print('DS rdata: ', rdata)
+
+    #unpack rdata
+    def unpack_DS_rdata(self):
+        self.flags, self.algorithm, self.digestType = st.unpack('!HBB', self.rdata)
+        self.rdata = self.rdata[4:]
+        self.digest = self.rdata
+
 
 class RRSIG_Resource:
     def __init__(self, record_header, rdata):
         self.record_header = record_header
+        self.rdata = rdata
+        self.type = 0
+        self.algorithm = 0
+        self.label = 0
+        self.TTL = 0
+        self.expiration = 0
+        self.inception = 0
+        self.keytag = 0
+        self.signerName = 0
+        print('RRSIG rdata: ', self.rdata)
+    
+    def unpack_RRSIG_rdata(self):
+        self.type, self.algorithm, self.label, self.TTL, self.expiration, self.inception, self.keytag, self.signerName = ('!HBBIIIH', self.rdata)
+        self.rdata = self.rdata[24:]
+
+
 
     
 
@@ -287,7 +328,7 @@ class MessHeader:
         self.z = 0
         # authentic data
         self.ad = 1
-        # checking disabled
+        # checking enabled
         self.cd = 1
         #response code
         self.rcode = 0
@@ -435,9 +476,9 @@ class DNSClient:
                 elif answer.type == 43:
                     print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
                 elif answer.type == 46:
-                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("RRSIG\t" + str(answer.resource_data.name) + "\t" + "nonauth")
                 elif answer.type == 48:
-                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("DNSKEY\t" + str(answer.resource_data.name) + "\t" + "nonauth")
 
         if self.type == 1:
             self.resource_data = A_Resource(rdata)
