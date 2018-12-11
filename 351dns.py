@@ -125,7 +125,9 @@ def decode_string(mess, off):
     off = 0
     res = ''
     while mess[ind] != 0:
+
         v = mess[ind]
+
         if (v>>6) == 3:
             next = st.unpack('>H', mess[ind:ind + 2])[0]
             if off == 0:
@@ -134,7 +136,6 @@ def decode_string(mess, off):
         else:
             res += mess[ind + 1:ind + 1 + v].decode('utf-8') + '.'
             ind += v + 1
-
     if off == 0:
         off = ind + 1
     res = res[:-1]
@@ -187,15 +188,82 @@ class DNSMessageFormat:
             self.addit_RRs.append(ResRecord())
             off = self.addit_RRs[i].decode(mess, off)
 
+
 class AResource:
-    def __init__(self, data):
-        ip = st.unpack('BBBB', data)
+    def __init__(self, name, typ, req_class, ttl, rdata):
+        off = 0
+        self.name = name
+        self.typ = typ
+        self.req_class = req_class
+        self.ttl = ttl
+        self.length = 4
+
+        ip = st.unpack('BBBB', rdata)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
+        
 
 class CNAME_Resource:
-    def __init__(self, mess, off):
-        self.name = decode_string(mess, off)[0]
+    def __init__(self, name, typ, req_class, ttl, length, rdata):
+        self.name = name
+        self.typ = typ
+        self.req_class = req_class
+        self.ttl = ttl
+        self.length = length
+        print(self.name)
+
+class DNSKEY_Resource:
+    def __init__(self, name, typ, req_class, ttl, length, rdata):
+        off = 0
+        self.name = name
+        self.typ = typ
+        self.req_class = req_class
+        self.ttl = ttl
+        self.length = length
+        self.flags, self.protocol, self.algorithm = st.unpack('!HBB', rdata[:4])
+        self.rdata = rdata[4:]
+        self.digest = self.rdata
+
+        # hexdump(self.digest)
+
+class DS_Resource:
+    def __init__(self, name, typ, req_class, ttl, length, rdata):
+        self.name = name
+        self.typ = typ
+        self.req_class = req_class
+        self.ttl = ttl
+        self.length = length
+        self.flags, self.algorithm, self.digestType = st.unpack('!HBB', self.rdata)
+        self.rdata = self.rdata[4:]
+        self.digest = self.rdata
+        print('DS rdata: ', rdata)
+
+
+class RRSIG_Resource:
+    def __init__(self, name, typ, req_class, ttl, length, rdata):
+        self.name = name
+        self.typ = typ
+        self.req_class = req_class
+        self.ttl = ttl
+        self.length = length
+        self.type, self.algorithm, self.label, self.OrgTTL, self.expiration, self.inception, self.keytag = st.unpack('>HBBIIIH', rdata[:18])
+        ord = 18
+        if(name == '<Root>'):
+            ord += 1
+        elif(len(name) <=3):
+            ord+=len(name)
+        else:
+            ord+=len(name)+2
+
+
+        self.rdata = rdata[ord:]
+        
+        # hexdump(self.rdata)
+
+        
+        
+    
+        
 
 
 # Extract response record:
@@ -204,25 +272,28 @@ class ResRecord:
     def decode(self, mess, off):
         name = decode_string(mess, off)
         off = name[1]
+        print(name)
         self.name = name[0]
         self.type = st.unpack('>H',mess[off:off + 2])[0]
         off += 2
         self.req = st.unpack('>H', mess[off:off + 2])[0]
         off += 2
-        self.ttl = st.unpack('>I', mess[off: off + 4])[0]
+        self.ttl = st.unpack('>I', mess[off:off + 4])[0]
         off += 4
         self.rd_length = st.unpack('>H', mess[off:off + 2])[0]
         off += 2
 
         rdata = mess[off: off + self.rd_length]
-
         if self.type == 1:
-            self.resource_data = AResource(rdata)
+            self.resource_data = AResource(self.name, self.type, self.req, self.ttl, rdata)
         elif self.type == 5:
-            self.resource_data = CNAME_Resource(mess, off)
-        else:
-            print("ERROR\tRecord is not of type A or CNAME")
-            quit()
+            self.resource_data = CNAME_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
+        elif self.type == 48:
+            self.resource_data = DNSKEY_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
+        elif self.type == 46:
+            self.resource_data = RRSIG_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
+        elif self.type == 42:
+            self.resource_data = DS_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
 
         return off + self.rd_length
 
@@ -284,9 +355,9 @@ class MessHeader:
         # Z
         self.z = 0
         # authentic data
-        self.ad = 0
+        self.ad = 1
         # checking disabled
-        self.cd = 0
+        self.cd = 1
         #response code
         self.rcode = 0
         # questions
@@ -296,7 +367,6 @@ class MessHeader:
         # authority RRs
         self.ns = 0
         # additional RRs
-        # self.ar = 0
         self.ar = 1
 
     def decode(self, mess):
@@ -392,7 +462,7 @@ class DNSClient:
                 quit()
 
     # function to send a request
-    def sendQuery(self, request, recursion_desired=True, qtype="A"):
+    def sendQuery(self, request, recursion_desired, qtype):
 
         # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
         dns_packet = DNSMessageFormat()
@@ -404,7 +474,7 @@ class DNSClient:
         # Sends DNS Query Packet to specified DNS server using
         self.socket.send(query)
         try:
-            response = self.socket.recv(1024)
+            response = self.socket.recv(2048)
         except Exception:
             # Timeout
             print("NORESPONSE\n")
@@ -413,7 +483,8 @@ class DNSClient:
         #TODO
         # CODE IN DNS_DATA TAKES CARE OF THE RESPONSE
         print('\nRESPONSE')
-        hexdump(response)
+        # hexdump(response)
+        
         dns_packet.decode(response)
 
         #TODO TODO
@@ -442,34 +513,16 @@ class DNSClient:
             print("")
             self.socket.close()
 
-        elif not recursion_desired:
 
-            for resource_record in dns_packet.additional_RRs:
-                try:
-                    #connect to server again
-                    self.socket.connect((server, port))
-
-                    # check if IPv6
-                    ipv6 = (resource_record.type == 28)
-                    if(ipv6):
-                        # send query again
-                        print('test')
-                        # self.sendQuery(request, recursion_desired=False, 'ipv6')
-                    else:
-                        self.sendQuery(request, recursion_desired=False)
-                except Exception:
-                    # NOTFOUND or ERROR?
-                    print("ERROR CONNECTING TO SERVER. PLEASE MAKE SURE YOUR SERVER IS CORRECT.")
-                    quit()
-
-if len(sys.argv) != 3:
-    print("Usage: ./351dns.py @<server:port> <name>")
+if len(sys.argv) != 4:
+    print("Usage: ./351dns.py @<server:port> <name> <record>")
 elif sys.argv[1][0] != "@":
-    print("Usage: ./351dns.py @<server:port> <name>")
+    print("Usage: ./351dns.py @<server:port> <name> <record>")
 else:
     servernport = sys.argv[1][1:].split(':')
     server = servernport[0]
 
+    record = sys.argv[3]
    
     
     name = sys.argv[2]
@@ -480,6 +533,6 @@ else:
 
 
     client = DNSClient(server, port)
-    client.sendQuery(name)
+    client.sendQuery(name, True, record)
 
     client.socket.close()
