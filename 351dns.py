@@ -20,27 +20,27 @@ addit_rec = bytes([0,0,41,16,0,0,0,128,0,0,0])
 
 # --- - chunking helpers
 def chunks(seq, size):
-  '''Generator that cuts sequence (bytes, memoryview, etc.)
-     into chunks of given size. If `seq` length is not multiply
-     of `size`, the lengh of the last chunk returned will be
-     less than requested.
+    '''Generator that cuts sequence (bytes, memoryview, etc.)
+        into chunks of given size. If `seq` length is not multiply
+        of `size`, the lengh of the last chunk returned will be
+        less than requested.
 
-     >>> list( chunks([1,2,3,4,5,6,7], 3) )
-     [[1, 2, 3], [4, 5, 6], [7]]
-  '''
-  d, m = divmod(len(seq), size)
-  for i in range(d):
-    yield seq[i*size:(i+1)*size]
-  if m:
-    yield seq[d*size:]
+        >>> list( chunks([1,2,3,4,5,6,7], 3) )
+        [[1, 2, 3], [4, 5, 6], [7]]
+    '''
+    d, m = divmod(len(seq), size)
+    for i in range(d):
+        yield seq[i*size:(i+1)*size]
+    if m:
+        yield seq[d*size:]
 
 def chunkread(f, size):
-  '''Generator that reads from file like object. May return less
-     data than requested on the last read.'''
-  c = f.read(size)
-  while len(c):
-    yield c
+    '''Generator that reads from file like object. May return less
+    data than requested on the last read.'''
     c = f.read(size)
+    while len(c):
+        yield c
+        c = f.read(size)
 
 def genchunks(mixed, size):
   '''Generator to chunk binary sequences or file like objects.
