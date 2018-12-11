@@ -171,19 +171,27 @@ class DNSMessageFormat:
             self.auth_RRs.append(ResRecord())
             off = self.auth_RRs[i].decode(mess, off)
 
+
+
 ###########################################
 #         Record Class Information        #
 ###########################################
 
+"""
+A_Resource for getting required information for the A record received
+"""
 class A_Resource:
     def __init__(self, record_header, rdata):
-        self.record = record_header
+        self.record_header = record_header
         self.rdata = rdata
         ip = st.unpack('BBBB', rdata)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
         print('A rdata: ', rdata)
 
+"""
+DNSKEY_Resource for getting required information for the DNSKEY record received
+"""
 class DNSKEY_Resource:
     def __init___(self, record_header, rdata):
         self.record_header = record_header
@@ -199,6 +207,9 @@ class DNSKEY_Resource:
         self.rdata = self.rdata[4:]
         self.digest = self.rdata
 
+"""
+DS_Resource for getting required information for the DS record received
+"""
 class DS_Resource:
     def __init__(self, record_header, rdata):
         self.record_header = record_header
@@ -214,7 +225,9 @@ class DS_Resource:
         self.rdata = self.rdata[4:]
         self.digest = self.rdata
 
-
+"""
+RRSIG_Resource for getting required information for the RRSIG record received
+"""
 class RRSIG_Resource:
     def __init__(self, record_header, rdata):
         self.record_header = record_header
@@ -234,8 +247,11 @@ class RRSIG_Resource:
         self.rdata = self.rdata[24:]
 
 
+###########################################
+#      Crypto Library Implementation      #
+###########################################
 
-    
+def 
 
 # Extract response record:
 class ResRecord:
@@ -435,6 +451,8 @@ class DNSClient:
                 quit()
 
     # function to send a request
+    # TODO Can you comment/clean up this code? I think the professor is going to be grading our code moreso our output
+    # so we should at least make it readable and have the correct intentions
     def sendQuery(self, request, recursion_desired=True, qtype="A"):
 
         # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
@@ -469,45 +487,40 @@ class DNSClient:
         if len(dns_packet.answers) > 0:
             # go through the answers in the packet
             for answer in dns_packet.answers:
-                # check whether there's authoritation
                 print('INSIDE THE ELSE STATEMENT: ', answer.type)
                 if answer.type == 1:
                     print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
                 elif answer.type == 43:
-                    print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    #print("DS\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("Printing DS Record: ")
                 elif answer.type == 46:
-                    print("RRSIG\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    #print("RRSIG\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("Printing RRSIG Record: ")
                 elif answer.type == 48:
-                    print("DNSKEY\t" + str(answer.resource_data.name) + "\t" + "nonauth")
-
+                    #print("DNSKEY\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+                    print("Printing DNSKEY Record: ")
+                else:
+                    print("Printing from else: ERROR\t")
+                    # or NOTFOUND NORESPONSE
+        print('PRINTING MYSELF: ', self)
+        # what does this do??
         if self.type == 1:
-            self.resource_data = A_Resource(rdata)
+            self.resource_data = A_Resource(answer.resource_data)
         elif self.type == 43:
-            self.resource_data = DS_Resource(rdata)
+            self.resource_data = DS_Resource(answer.resource_data)
         elif self.type == 46:
-            self.resource_data = RRSIG_Resource(rdata)
+            self.resource_data = RRSIG_Resource(answer.resource_data)
         elif self.type == 48:
-            self.resource_data = DNSKEY_Resource(rdata)
-
-
+            self.resource_data = DNSKEY_Resource(answer.resource_data)
             print("")
             self.socket.close()
 
         elif not recursion_desired:
-
             for resource_record in dns_packet.additional_RRs:
                 try:
                     #connect to server again
-                    self.socket.connect((server, port))
-
-                    # check if IPv6
-                    ipv6 = (resource_record.type == 28)
-                    if(ipv6):
-                        # send query again
-                        print('test')
-                        # self.sendQuery(request, recursion_desired=False, 'ipv6')
-                    else:
-                        self.sendQuery(request, recursion_desired=False)
+                    self.socket.connect(server, port)
+                    self.sendQuery(request, recursion_desired=False)
                 except Exception:
                     # NOTFOUND or ERROR?
                     print("ERROR CONNECTING TO SERVER. PLEASE MAKE SURE YOUR SERVER IS CORRECT.")
