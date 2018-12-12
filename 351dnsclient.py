@@ -205,6 +205,7 @@ class DNSKEY_Resource:
     def __init___(self, record_header, rdata):
         self.record_header = record_header
         self.rdata = rdata
+
         self.flags = 0
         self.protocol = 0
         self.algorithm = 0
@@ -214,7 +215,7 @@ class DNSKEY_Resource:
     def unpack_DNSKEY_rdata(self):
         self.flags, self.protocol, self.algorithm = st.unpack('!HBB', self.rdata)
         self.rdata = self.rdata[4:]
-        self.digest = self.rdata
+        self.digest = self.rdata #public key
 
 """
 DS_Resource for getting required information for the DS record received
@@ -458,19 +459,18 @@ class DNSClient:
                 print("ERROR\tRESPONSE CODE 5: REFUSED")
                 quit()
 
-    # function to send a request
-    # TODO Can you comment/clean up this code? I think the professor is going to be grading our code moreso our output
-    # so we should at least make it readable and have the correct intentions
-    def sendQuery(self, request, record_type, recursion_desired=True):
 
-        # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
+    # TODO Comment this code
+    def sendQuery(self, request, record_type, recursion_desired=True):
+        # Construct DNS Packet using specified format.
         dns_packet = DNSMessageFormat()
+        # Construct query to send across UDP connection
         query = dns_packet.encode(request, recursion_desired, record_type)
-        print('query ', query)
+        # Print the query to console
         hexdump(query)
         print('\n')
-        print("\nSending packet . . .\n")
 
+        print("\nSending packet . . .\n")
         # Sends DNS Query Packet to specified DNS server using UDP
         self.socket.send(query)
         try:
@@ -480,14 +480,12 @@ class DNSClient:
             print("NORESPONSE\n")
             quit()
 
-        # CODE IN DNS_DATA TAKES CARE OF THE RESPONSE
+        # Print the response to console
         print('\nRESPONSE')
         hexdump(response)
-
         dns_packet.decode(response)
 
         print("*** RESPONSE FROM SERVER ***\n")
-
         # check for error in response code
         self.check_for_error(dns_packet.header.rcode)
 
@@ -499,7 +497,7 @@ class DNSClient:
                     #print("IP\t" + str(answer.resource_data.ip) + "\t" + str(answer.resource_data.digestType) + " VALID|INVALID")
                     print("IP Output here")
                 elif answer.type == 43:
-                    print("DS\t" + str(answer.resource_data.digest) + "\t" + "nonauth")
+                    #print("DS\t" + str(answer.resource_data.digest) + "\t" + "nonauth")
                     print("Printing DS Record: ")
                 elif answer.type == 46:
                     #print("RRSIG\t" + str(answer.resource_data.name) + "\t" + "nonauth")
@@ -508,21 +506,8 @@ class DNSClient:
                     #print("DNSKEY\t" + str(answer.resource_data.name) + "\t" + "nonauth")
                     print("Printing DNSKEY Record: ")
 
-
-        print('PRINTING MYSELF: ', self)
         # what does this code here do cause this is where i'm lost ??
-        if self.type == 1:
-            self.resource_data = A_Resource(answer.resource_data)
-        elif self.type == 43:
-            self.resource_data = DS_Resource(answer.resource_data)
-        elif self.type == 46:
-            self.resource_data = RRSIG_Resource(answer.resource_data)
-        elif self.type == 48:
-            self.resource_data = DNSKEY_Resource(answer.resource_data)
-            print("")
-            self.socket.close()
-
-        elif not recursion_desired:
+        if not recursion_desired:
             for resource_record in dns_packet.additional_RRs:
                 try:
                     #connect to server again
