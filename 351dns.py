@@ -14,9 +14,18 @@ import struct as st
 import random as rand
 import math
 import binascii
+from Crypto.PublicKey import RSA 
+from Crypto.Signature import PKCS1_v1_5 
+from Crypto.Hash import SHA256 
+from base64 import b64decode 
 
 PY3K = sys.version_info >= (3, 0)
 addit_rec = bytes([0,0,41,16,0,0,0,128,0,0,0])
+AREC = 1
+DNSKEYREC = 48
+DSREC = 43
+RRSIGREC = 46
+CNAMEREC = 5
 
 # --- - chunking helpers
 def chunks(seq, size):
@@ -197,10 +206,12 @@ class AResource:
         self.req_class = req_class
         self.ttl = ttl
         self.length = 4
+        self.rdata = rdata
 
         ip = st.unpack('BBBB', rdata)
         self.ip = str(ip[0]) + '.' + str(ip[1])
         self.ip += '.' + str(ip[2]) + '.' + str(ip[3])
+        print('A res', str(ip))
         
 
 class CNAME_Resource:
@@ -210,6 +221,7 @@ class CNAME_Resource:
         self.req_class = req_class
         self.ttl = ttl
         self.length = length
+
         print(self.name)
 
 class DNSKEY_Resource:
@@ -221,8 +233,12 @@ class DNSKEY_Resource:
         self.ttl = ttl
         self.length = length
         self.flags, self.protocol, self.algorithm = st.unpack('!HBB', rdata[:4])
+        self.KSK = st.unpack('>H', rdata[:2])[0]
+
         self.rdata = rdata[4:]
         self.digest = self.rdata
+
+        print('DNSKEY:', self.KSK)
 
         # hexdump(self.digest)
 
@@ -233,10 +249,12 @@ class DS_Resource:
         self.req_class = req_class
         self.ttl = ttl
         self.length = length
-        self.flags, self.algorithm, self.digestType = st.unpack('!HBB', self.rdata)
-        self.rdata = self.rdata[4:]
+        self.id, self.algorithm, self.digestType = st.unpack('!HBB', rdata[:4])
+        self.rdata = rdata[4:]
         self.digest = self.rdata
-        print('DS rdata: ', rdata)
+
+        print('DS Record', self.id)
+
 
 
 class RRSIG_Resource:
@@ -258,6 +276,7 @@ class RRSIG_Resource:
 
         self.rdata = rdata[ord:]
         
+        print('RRSIG', self.keytag, self.algorithm)
         # hexdump(self.rdata)
 
         
@@ -272,7 +291,9 @@ class ResRecord:
     def decode(self, mess, off):
         name = decode_string(mess, off)
         off = name[1]
-        print(name)
+
+
+
         self.name = name[0]
         self.type = st.unpack('>H',mess[off:off + 2])[0]
         off += 2
@@ -292,7 +313,7 @@ class ResRecord:
             self.resource_data = DNSKEY_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
         elif self.type == 46:
             self.resource_data = RRSIG_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
-        elif self.type == 42:
+        elif self.type == 43:
             self.resource_data = DS_Resource(self.name, self.type, self.req, self.ttl, self.rd_length, rdata)
 
         return off + self.rd_length
@@ -309,6 +330,8 @@ class DNSQuest:
         return off + 4
 
     def encode_name(self):
+        if(self.name == 'root'):
+            return b'\x00'
         n = self.name
         if n.endswith('.'):
             n = n[:-1]
@@ -467,10 +490,10 @@ class DNSClient:
         # CODE IN OTHER CLASS TAKES CARE OF MAKING THE DNS PACKET / QUERY
         dns_packet = DNSMessageFormat()
         query = dns_packet.encode(request, recursion_desired, qtype)
-        hexdump(query)
-        print('\n')
-        print("\nSending packet . . .\n")
 
+        print('\n')
+        print("\nSending packet for ",str(dns_packet.question.type), " to ",dns_packet.question.name ,"\n")
+        hexdump(query)
         # Sends DNS Query Packet to specified DNS server using
         self.socket.send(query)
         try:
@@ -480,38 +503,35 @@ class DNSClient:
             print("NORESPONSE\n")
             quit()
 
-        #TODO
-        # CODE IN DNS_DATA TAKES CARE OF THE RESPONSE
-        print('\nRESPONSE')
         # hexdump(response)
         
         dns_packet.decode(response)
 
-        #TODO TODO
-        # FOR DEBUGGING, REMOVE LATER ?
-        print("*** RESPONSE FROM SERVER ***\n")
+
 
 
         # check for error in response code
         self.check_for_error(dns_packet.header.rcode)
 
-        if len(dns_packet.answers) > 0:
-            # go through the answers in the packet
-            for answer in dns_packet.answers:
-                # check whether there's authoritation
-                if bool(dns_packet.header.aa) == True:
-                    if answer.type == 1:
-                        print("IP\t" + str(answer.resource_data.ip) + "\t" + "auth")
-                    elif answer.type == 5:
-                        print("CNAME\t" + str(answer.resource_data.name) + "\t" + "auth")
-                else:
-                    if answer.type == 1:
-                        print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
-                    elif answer.type == 5:
-                        print("CNAME\t" + str(answer.resource_data.name) + "\t" + "nonauth")
+        # if len(dns_packet.answers) > 0:
+        #     # go through the answers in the packet
+        #     for answer in dns_packet.answers:
+        #         # check whether there's authoritation
+        #         if bool(dns_packet.header.aa) == True:
+        #             if answer.type == 1:
+        #                 print("IP\t" + str(answer.resource_data.ip) + "\t" + "auth")
+        #             elif answer.type == 5:
+        #                 print("CNAME\t" + str(answer.resource_data.name) + "\t" + "auth")
+        #         else:
+        #             if answer.type == 1:
+        #                 print("IP\t" + str(answer.resource_data.ip) + "\t" + "nonauth")
+        #             elif answer.type == 5:
+        #                 print("CNAME\t" + str(answer.resource_data.name) + "\t" + "nonauth")
 
-            print("")
-            self.socket.close()
+        #     print("")
+        #     self.socket.close()
+        return dns_packet
+
 
 
 if len(sys.argv) != 4:
@@ -531,8 +551,54 @@ else:
     else:
         port = servernport[1]
 
+    zone = name.split('.')[1]
 
     client = DNSClient(server, port)
-    client.sendQuery(name, True, record)
+    # p1 = client.sendQuery(name, True, record)
+    # p2 = client.sendQuery(zone, True, record)
+    # p3 = client.sendQuery('root', True, record)
+
+    if(record == 'A'):
+        domain1_A = client.sendQuery(name, True, 'A')
+        domain1_Key = client.sendQuery(name, True, 'DNSKEY')
+        for item in domain1_Key.answers:
+            print(item.type)
+            if(item.type == DNSKEYREC):
+                if(item.resource_data.KSK == 257):
+                    key = item.resource_data
+        for item in domain1_A.answers:
+            if(item.type == AREC):
+                ip = item.resource_data
+            if(item.type == RRSIGREC):
+                sig = item.resource_data
+        
+        strDigest = str(codecs.encode(key.digest, 'hex_codec'), 'utf-8')
+        print(strDigest[:2])
+        # print(strDigest)
+        # rsakey = RSA.importKey(strDigest) 
+        # signer = PKCS1_v1_5.new(rsakey) 
+        # digest = SHA256.new() 
+        # digest.update(b64decode(data)) 
+        # if signer.verify(digest, b64decode(domain1_A.answers[1].rdata)):
+        #     print("True")
+        # print("False")
+
+    elif(record == 'DNSKEY'):
+        print('test')
+    else:
+        print('DS')
+    # for answer in p1.answers:
+    #     if(answer.type == 1):
+    #         print(str(answer.resource_data.ip))
+    #     if(answer.type == RRSIGREC):
+    #         print(answer.resource_data.algorithm)
+
 
     client.socket.close()
+
+
+
+
+
+
+
